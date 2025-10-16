@@ -1,16 +1,18 @@
 package cz.matyasuss.hikerbox.ui.screen
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import cz.matyasuss.hikerbox.data.ChargerRepository
 import cz.matyasuss.hikerbox.model.Charger
 import cz.matyasuss.hikerbox.ui.map.OSMMapView
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapScreen() {
     var chargers by remember { mutableStateOf<List<Charger>>(emptyList()) }
@@ -42,30 +44,31 @@ fun MapScreen() {
     // Get unique types from data
     val types = chargers.map { it.typ_spec }.distinct()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Hikerbox") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                )
+    Box(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        if (isLoading) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = androidx.compose.ui.Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
+        } else {
+            // Map view as background
+            OSMMapView(
+                chargers = filteredChargers,
+                modifier = Modifier.fillMaxSize()
             )
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            if (isLoading) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = androidx.compose.ui.Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
-            } else {
-                // Filter chips row
+
+            // Filter chips on top of map with proper elevation
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .zIndex(1f),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+                shadowElevation = 4.dp
+            ) {
                 FilterChipsRow(
                     types = types,
                     selectedType = selectedType,
@@ -75,12 +78,6 @@ fun MapScreen() {
                         selectedType = if (selectedType == type) null else type
                     },
                     onAllSelected = { selectedType = null }
-                )
-
-                // Map view
-                OSMMapView(
-                    chargers = filteredChargers,
-                    modifier = Modifier.fillMaxSize()
                 )
             }
         }
@@ -99,7 +96,8 @@ private fun FilterChipsRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(8.dp),
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 8.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         // "All" filter chip
