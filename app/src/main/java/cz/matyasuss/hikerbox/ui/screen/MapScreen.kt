@@ -14,7 +14,7 @@ import cz.matyasuss.hikerbox.ui.map.OSMMapView
 import kotlinx.coroutines.launch
 
 @Composable
-fun MapScreen() {
+fun MapScreen(onChargerClick: (String) -> Unit = {}) {
     var chargers by remember { mutableStateOf<List<Charger>>(emptyList()) }
     var selectedType by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(true) }
@@ -36,13 +36,13 @@ fun MapScreen() {
 
     // Filter chargers based on selected type
     val filteredChargers = if (selectedType != null) {
-        chargers.filter { it.typ_spec == selectedType }
+        chargers.filter { it.typeSpec == selectedType }
     } else {
         chargers
     }
 
     // Get unique types from data
-    val types = chargers.map { it.typ_spec }.distinct()
+    val types = chargers.map { it.typeSpec }.distinct()
 
     Box(
         modifier = Modifier.fillMaxSize()
@@ -58,6 +58,7 @@ fun MapScreen() {
             // Map view as background
             OSMMapView(
                 chargers = filteredChargers,
+                onChargerClick = onChargerClick,
                 modifier = Modifier.fillMaxSize()
             )
 
@@ -109,7 +110,7 @@ private fun FilterChipsRow(
 
         // Type-specific filter chips
         types.forEach { type ->
-            val count = chargers.count { it.typ_spec == type }
+            val count = chargers.count { it.typeSpec == type }
             FilterChip(
                 selected = selectedType == type,
                 onClick = { onTypeSelected(type) },

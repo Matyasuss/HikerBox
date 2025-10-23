@@ -4,10 +4,9 @@ Co už tam je:
 - Home page
 - Nastavení page
 - Filtry
+- Stránka daného místa
 
 Dodělat:
 - Point clustering (chybí)
-- Filtry (Ať vypadají líp)
 - Home page (opravit logo, zlepšit design)
 - Nastavení (přidat funkčnost)
-- Stránka daného místa

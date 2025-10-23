@@ -2,12 +2,12 @@ package cz.matyasuss.hikerbox.model
 
 data class Charger(
     val id: String,
-    val nazev: String,
+    val name: String,
     val latitude: Double,
     val longitude: Double,
-    val typ_spec: String,
-    val popis: String,
+    val typeSpec: String,
+    val description: String,
     val link: String,
-    val note_color: String?,
+    val noteColor: String?,
     val note: String?
 )

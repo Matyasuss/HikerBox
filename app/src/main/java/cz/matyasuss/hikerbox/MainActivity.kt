@@ -13,11 +13,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import cz.matyasuss.hikerbox.ui.navigation.Screen
+import cz.matyasuss.hikerbox.ui.screen.DetailScreen
 import cz.matyasuss.hikerbox.ui.screen.HomeScreen
 import cz.matyasuss.hikerbox.ui.screen.MapScreen
 import cz.matyasuss.hikerbox.ui.screen.SettingsScreen
@@ -41,26 +44,31 @@ fun MainScreen() {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
+    // Skrýt bottom bar na detail obrazovce
+    val showBottomBar = currentRoute?.startsWith("detail/") != true
+
     Scaffold(
         bottomBar = {
-            NavigationBar {
-                BottomNavItem.values().forEach { item ->
-                    NavigationBarItem(
-                        icon = { Icon(item.icon, contentDescription = item.title) },
-                        label = { Text(item.title) },
-                        selected = currentRoute == item.route,
-                        onClick = {
-                            if (currentRoute != item.route) {
-                                navController.navigate(item.route) {
-                                    popUpTo(Screen.Home.route) {
-                                        saveState = true
+            if (showBottomBar) {
+                NavigationBar {
+                    BottomNavItem.entries.forEach { item ->
+                        NavigationBarItem(
+                            icon = { Icon(item.icon, contentDescription = item.title) },
+                            label = { Text(item.title) },
+                            selected = currentRoute == item.route,
+                            onClick = {
+                                if (currentRoute != item.route) {
+                                    navController.navigate(item.route) {
+                                        popUpTo(Screen.Home.route) {
+                                            saveState = true
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = true
                                     }
-                                    launchSingleTop = true
-                                    restoreState = true
                                 }
                             }
-                        }
-                    )
+                        )
+                    }
                 }
             }
         }
@@ -74,10 +82,26 @@ fun MainScreen() {
                 HomeScreen()
             }
             composable(Screen.Map.route) {
-                MapScreen()
+                MapScreen(
+                    onChargerClick = { chargerId ->
+                        navController.navigate(Screen.Detail.createRoute(chargerId))
+                    }
+                )
             }
             composable(Screen.Settings.route) {
                 SettingsScreen()
+            }
+            composable(
+                route = Screen.Detail.route,
+                arguments = listOf(
+                    navArgument("chargerId") { type = NavType.StringType }
+                )
+            ) { backStackEntry ->
+                val chargerId = backStackEntry.arguments?.getString("chargerId") ?: ""
+                DetailScreen(
+                    chargerId = chargerId,
+                    onNavigateBack = { navController.navigateUp() }
+                )
             }
         }
     }

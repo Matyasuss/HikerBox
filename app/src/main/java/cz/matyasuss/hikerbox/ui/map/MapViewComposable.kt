@@ -14,9 +14,15 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.CopyrightOverlay
 import org.osmdroid.views.overlay.Marker
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.drawable.toDrawable
 
 @Composable
-fun OSMMapView(chargers: List<Charger>, modifier: Modifier = Modifier) {
+fun OSMMapView(
+    modifier: Modifier = Modifier,
+    chargers: List<Charger>,
+    onChargerClick: (String) -> Unit = {}
+) {
     AndroidView(
         factory = { context ->
             Configuration.getInstance().load(
@@ -46,17 +52,23 @@ fun OSMMapView(chargers: List<Charger>, modifier: Modifier = Modifier) {
             chargers.forEach { charger ->
                 val marker = Marker(mapView).apply {
                     position = GeoPoint(charger.latitude, charger.longitude)
-                    title = charger.nazev
-                    snippet = charger.popis
+                    title = charger.name
+                    snippet = charger.description
 
                     // Set marker color based on type
-                    val color = when (charger.typ_spec) {
+                    val color = when (charger.typeSpec) {
                         "charge_lock" -> Color.BLUE
                         "charge_unloc" -> Color.GREEN
                         else -> Color.RED
                     }
 
                     icon = createColoredMarker(mapView.context, color)
+
+                    // Handle marker click
+                    setOnMarkerClickListener { _, _ ->
+                        onChargerClick(charger.id)
+                        true
+                    }
                 }
                 mapView.overlays.add(marker)
             }
@@ -69,11 +81,7 @@ fun OSMMapView(chargers: List<Charger>, modifier: Modifier = Modifier) {
 
 private fun createColoredMarker(context: Context, color: Int): BitmapDrawable {
     val size = 40
-    val bitmap = android.graphics.Bitmap.createBitmap(
-        size,
-        size,
-        android.graphics.Bitmap.Config.ARGB_8888
-    )
+    val bitmap = createBitmap(size, size)
     val canvas = android.graphics.Canvas(bitmap)
     val paint = Paint().apply {
         this.color = color
@@ -90,5 +98,5 @@ private fun createColoredMarker(context: Context, color: Int): BitmapDrawable {
     paint.strokeWidth = 3f
     canvas.drawCircle(size / 2f, size / 2f, size / 2f - 2, paint)
 
-    return BitmapDrawable(context.resources, bitmap)
+    return bitmap.toDrawable(context.resources)
 }
