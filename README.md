@@ -10,3 +10,5 @@ Dodělat:
 - Point clustering (chybí)
 - Home page (opravit logo, zlepšit design)
 - Nastavení (přidat funkčnost)
+- Opravit google login
+- zprovoznit nastavení

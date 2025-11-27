@@ -7,8 +7,7 @@ import org.json.JSONArray
 import java.net.URL
 
 object ChargerRepository {
-    private const val CHARGERS_URL = "https://data.matyasuss.cz/hikerbox/chargers.json"
-
+    private const val CHARGERS_URL = "https://hikerbox.matyasuss.cz/api/chargers.json.php"
     suspend fun loadChargers(): List<Charger> = withContext(Dispatchers.IO) {
         val json = URL(CHARGERS_URL).readText()
         val jsonArray = JSONArray(json)

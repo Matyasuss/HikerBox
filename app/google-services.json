@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "768023661808",
+    "project_id": "hikerbox-cz",
+    "storage_bucket": "hikerbox-cz.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:768023661808:android:95adcae9a6e83f06d24635",
+        "android_client_info": {
+          "package_name": "cz.matyasuss.hikerbox"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDmD2n1v3x_7qmA-koODjWNMFh_njLSOTQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
