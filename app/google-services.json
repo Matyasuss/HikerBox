@@ -12,7 +12,20 @@
           "package_name": "cz.matyasuss.hikerbox"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "768023661808-tblnplncininpea8uc6l31rgkm2s4ghq.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "cz.matyasuss.hikerbox",
+            "certificate_hash": "1487d5a1a5c3323dbcd3ea956ade85849dc883cd"
+          }
+        },
+        {
+          "client_id": "768023661808-3m005cmltb60dhvrcgc7usljq1u8p1f7.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDmD2n1v3x_7qmA-koODjWNMFh_njLSOTQ"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "768023661808-3m005cmltb60dhvrcgc7usljq1u8p1f7.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

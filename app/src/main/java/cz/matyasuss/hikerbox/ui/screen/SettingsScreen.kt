@@ -2,6 +2,7 @@ package cz.matyasuss.hikerbox.ui.screen
 
 import android.app.Activity
 import android.content.Intent
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -25,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -33,6 +35,8 @@ import cz.matyasuss.hikerbox.data.FirebaseAuthManager
 import cz.matyasuss.hikerbox.data.PreferencesManager
 import cz.matyasuss.hikerbox.model.LoginMethod
 import kotlinx.coroutines.launch
+
+private const val TAG = "SettingsScreen"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,24 +53,56 @@ fun SettingsScreen(
     var showLoginDialog by remember { mutableStateOf(false) }
     var showLogoutDialog by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isProcessingLogin by remember { mutableStateOf(false) }
 
-    // Google Sign-In launcher
+    // Google Sign-In launcher - FIXED VERSION
     val googleSignInLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            scope.launch {
-                val signInResult = authManager.handleGoogleSignInResult(result.data)
-                signInResult.onSuccess { user ->
-                    manager.login(
-                        LoginMethod.GOOGLE,
-                        user.email ?: "",
-                        user.displayName ?: user.email?.substringBefore("@") ?: "User"
-                    )
-                    errorMessage = null
-                }.onFailure { e ->
-                    errorMessage = "Google přihlášení selhalo: ${e.message}"
+        Log.d(TAG, "Google Sign-In result received: resultCode=${result.resultCode}, data=${result.data != null}")
+
+        isProcessingLogin = true
+
+        scope.launch {
+            try {
+                when (result.resultCode) {
+                    Activity.RESULT_OK -> {
+                        Log.d(TAG, "Processing Google Sign-In result with OK status")
+                        if (result.data == null) {
+                            Log.e(TAG, "Result data is null despite RESULT_OK")
+                            errorMessage = "Chyba: Žádná data z Google přihlášení"
+                            return@launch
+                        }
+
+                        val signInResult = authManager.handleGoogleSignInResult(result.data)
+
+                        signInResult.onSuccess { user ->
+                            Log.d(TAG, "Google Sign-In successful: ${user.email}")
+                            manager.login(
+                                LoginMethod.GOOGLE,
+                                user.email ?: "",
+                                user.displayName ?: user.email?.substringBefore("@") ?: "User"
+                            )
+                            errorMessage = null
+                        }.onFailure { e ->
+                            Log.e(TAG, "Google Sign-In failed", e)
+                            errorMessage = "Google přihlášení selhalo: ${e.message}"
+                        }
+                    }
+                    Activity.RESULT_CANCELED -> {
+                        Log.d(TAG, "Google Sign-In canceled by user")
+                        errorMessage = null // Don't show error for user cancellation
+                    }
+                    else -> {
+                        Log.w(TAG, "Unexpected result code: ${result.resultCode}")
+                        errorMessage = "Neočekávaný výsledek přihlášení (kód: ${result.resultCode})"
+                    }
                 }
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception during Google Sign-In processing", e)
+                errorMessage = "Chyba při zpracování přihlášení: ${e.localizedMessage ?: e.message}"
+            } finally {
+                isProcessingLogin = false
             }
         }
     }
@@ -90,6 +126,31 @@ fun SettingsScreen(
             modifier = Modifier.padding(bottom = 8.dp)
         )
 
+        // Processing indicator
+        if (isProcessingLogin) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp
+                    )
+                    Text(
+                        text = "Zpracovávám přihlášení...",
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
+            }
+        }
+
         // Error message
         errorMessage?.let { error ->
             Card(
@@ -103,10 +164,19 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Icon(Icons.Default.Warning, contentDescription = null)
-                    Text(
-                        text = error,
-                        color = MaterialTheme.colorScheme.onErrorContainer
-                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = error,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                    IconButton(onClick = { errorMessage = null }) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Zavřít",
+                            tint = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
                 }
             }
         }
@@ -172,12 +242,12 @@ fun SettingsScreen(
         ) {
             InfoItem(
                 label = "Verze",
-                value = "1.0.0"
+                value = "0.1.1"
             )
             Divider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
             InfoItem(
                 label = "Vývojář",
-                value = "Matyáš"
+                value = "Matyasuss"
             )
         }
     }
@@ -191,24 +261,35 @@ fun SettingsScreen(
             },
             onEmailLogin = { email, password ->
                 scope.launch {
-                    val result = authManager.signInWithEmail(email, password)
-                    result.onSuccess { user ->
-                        manager.login(
-                            LoginMethod.EMAIL,
-                            user.email ?: email,
-                            user.displayName ?: email.substringBefore("@")
-                        )
-                        showLoginDialog = false
-                        errorMessage = null
-                    }.onFailure { e ->
-                        errorMessage = "Email přihlášení selhalo: ${e.message}"
+                    try {
+                        isProcessingLogin = true
+                        val result = authManager.signInWithEmail(email, password)
+                        result.onSuccess { user ->
+                            manager.login(
+                                LoginMethod.EMAIL,
+                                user.email ?: email,
+                                user.displayName ?: email.substringBefore("@")
+                            )
+                            showLoginDialog = false
+                            errorMessage = null
+                        }.onFailure { e ->
+                            errorMessage = "Email přihlášení selhalo: ${e.message}"
+                        }
+                    } finally {
+                        isProcessingLogin = false
                     }
                 }
             },
             onGoogleLogin = {
-                val signInIntent = authManager.getGoogleSignInIntent()
-                googleSignInLauncher.launch(signInIntent)
-                showLoginDialog = false
+                try {
+                    Log.d(TAG, "Initiating Google Sign-In")
+                    val signInIntent = authManager.getGoogleSignInIntent()
+                    googleSignInLauncher.launch(signInIntent)
+                    showLoginDialog = false
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error launching Google Sign-In", e)
+                    errorMessage = "Chyba při spuštění Google přihlášení: ${e.message}"
+                }
             }
         )
     }
@@ -512,10 +593,7 @@ private fun LoginDialog(
                             icon = Icons.Default.AccountCircle,
                             title = "Google",
                             description = "Přihlásit se účtem Google",
-                            onClick = {
-                                onGoogleLogin()
-                                onDismiss()
-                            }
+                            onClick = onGoogleLogin
                         )
                     }
                 }
@@ -603,7 +681,6 @@ private fun LoginDialog(
                     onClick = {
                         if (email.isNotBlank() && password.isNotBlank()) {
                             onEmailLogin(email, password)
-                            onDismiss()
                         } else {
                             showError = true
                         }
