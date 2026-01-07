@@ -44,6 +44,7 @@ android {
 }
 
 dependencies {
+    implementation("com.google.firebase:firebase-firestore-ktx:24.10.0")
     // Firebase (použij BOM pro správu verzí)
     implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
     implementation("com.google.firebase:firebase-auth-ktx")

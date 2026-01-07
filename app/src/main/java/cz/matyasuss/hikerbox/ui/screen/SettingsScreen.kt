@@ -1,7 +1,6 @@
 package cz.matyasuss.hikerbox.ui.screen
 
 import android.app.Activity
-import android.content.Intent
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -11,7 +10,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -26,7 +24,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -41,7 +38,8 @@ private const val TAG = "SettingsScreen"
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    preferencesManager: PreferencesManager? = null
+    preferencesManager: PreferencesManager? = null,
+    onThemeChange: (Boolean) -> Unit = {}
 ) {
     val context = LocalContext.current
     val manager = preferencesManager ?: remember { PreferencesManager(context) }
@@ -52,32 +50,27 @@ fun SettingsScreen(
 
     var showLoginDialog by remember { mutableStateOf(false) }
     var showLogoutDialog by remember { mutableStateOf(false) }
+    var showAddChargerDialog by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isProcessingLogin by remember { mutableStateOf(false) }
 
-    // Google Sign-In launcher - FIXED VERSION
     val googleSignInLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        Log.d(TAG, "Google Sign-In result received: resultCode=${result.resultCode}, data=${result.data != null}")
-
+        Log.d(TAG, "Google Sign-In result received: resultCode=${result.resultCode}")
         isProcessingLogin = true
 
         scope.launch {
             try {
                 when (result.resultCode) {
                     Activity.RESULT_OK -> {
-                        Log.d(TAG, "Processing Google Sign-In result with OK status")
                         if (result.data == null) {
-                            Log.e(TAG, "Result data is null despite RESULT_OK")
                             errorMessage = "Chyba: Žádná data z Google přihlášení"
                             return@launch
                         }
 
                         val signInResult = authManager.handleGoogleSignInResult(result.data)
-
                         signInResult.onSuccess { user ->
-                            Log.d(TAG, "Google Sign-In successful: ${user.email}")
                             manager.login(
                                 LoginMethod.GOOGLE,
                                 user.email ?: "",
@@ -85,22 +78,18 @@ fun SettingsScreen(
                             )
                             errorMessage = null
                         }.onFailure { e ->
-                            Log.e(TAG, "Google Sign-In failed", e)
                             errorMessage = "Google přihlášení selhalo: ${e.message}"
                         }
                     }
                     Activity.RESULT_CANCELED -> {
-                        Log.d(TAG, "Google Sign-In canceled by user")
-                        errorMessage = null // Don't show error for user cancellation
+                        errorMessage = null
                     }
                     else -> {
-                        Log.w(TAG, "Unexpected result code: ${result.resultCode}")
-                        errorMessage = "Neočekávaný výsledek přihlášení (kód: ${result.resultCode})"
+                        errorMessage = "Neočekávaný výsledek přihlášení"
                     }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Exception during Google Sign-In processing", e)
-                errorMessage = "Chyba při zpracování přihlášení: ${e.localizedMessage ?: e.message}"
+                errorMessage = "Chyba při zpracování: ${e.localizedMessage}"
             } finally {
                 isProcessingLogin = false
             }
@@ -117,7 +106,6 @@ fun SettingsScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Header
         Text(
             text = "Nastavení",
             style = MaterialTheme.typography.headlineLarge,
@@ -126,7 +114,6 @@ fun SettingsScreen(
             modifier = Modifier.padding(bottom = 8.dp)
         )
 
-        // Processing indicator
         if (isProcessingLogin) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -151,7 +138,6 @@ fun SettingsScreen(
             }
         }
 
-        // Error message
         errorMessage?.let { error ->
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -181,7 +167,6 @@ fun SettingsScreen(
             }
         }
 
-        // User Profile Section
         UserProfileCard(
             isLoggedIn = preferences.isLoggedIn,
             displayName = preferences.displayName,
@@ -191,7 +176,21 @@ fun SettingsScreen(
             onLogoutClick = { showLogoutDialog = true }
         )
 
-        // App Settings Section
+        // Přidat stanici tlačítko
+        if (preferences.isLoggedIn) {
+            Button(
+                onClick = { showAddChargerDialog = true },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.tertiary
+                )
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Přidat novou stanici")
+            }
+        }
+
         SettingsSectionCard(
             title = "Obecné",
             icon = Icons.Default.Settings
@@ -199,10 +198,11 @@ fun SettingsScreen(
             SwitchSettingItem(
                 title = "Tmavý režim",
                 description = "Zobrazit aplikaci v tmavém tématu",
-                icon = Icons.Default.Warning,
+                icon = Icons.Default.Star,
                 checked = preferences.darkMode,
                 onCheckedChange = {
                     manager.updateSetting("dark_mode", it)
+                    onThemeChange(it)
                 }
             )
 
@@ -219,40 +219,16 @@ fun SettingsScreen(
             )
         }
 
-        // Map Settings Section
-        SettingsSectionCard(
-            title = "Mapa",
-            icon = Icons.Default.Place
-        ) {
-            SwitchSettingItem(
-                title = "Zobrazit všechny stanice",
-                description = "Zobrazit zamčené i odemčené stanice",
-                icon = Icons.Default.Face,
-                checked = preferences.showAllChargers,
-                onCheckedChange = {
-                    manager.updateSetting("show_all_chargers", it)
-                }
-            )
-        }
-
-        // About Section
         SettingsSectionCard(
             title = "O aplikaci",
             icon = Icons.Default.Info
         ) {
-            InfoItem(
-                label = "Verze",
-                value = "0.1.1"
-            )
+            InfoItem(label = "Verze", value = "0.2.0")
             Divider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-            InfoItem(
-                label = "Vývojář",
-                value = "Matyasuss"
-            )
+            InfoItem(label = "Vývojář", value = "Matyasuss")
         }
     }
 
-    // Login Dialog
     if (showLoginDialog) {
         LoginDialog(
             onDismiss = {
@@ -282,19 +258,16 @@ fun SettingsScreen(
             },
             onGoogleLogin = {
                 try {
-                    Log.d(TAG, "Initiating Google Sign-In")
                     val signInIntent = authManager.getGoogleSignInIntent()
                     googleSignInLauncher.launch(signInIntent)
                     showLoginDialog = false
                 } catch (e: Exception) {
-                    Log.e(TAG, "Error launching Google Sign-In", e)
                     errorMessage = "Chyba při spuštění Google přihlášení: ${e.message}"
                 }
             }
         )
     }
 
-    // Logout Confirmation Dialog
     if (showLogoutDialog) {
         AlertDialog(
             onDismissRequest = { showLogoutDialog = false },
@@ -315,6 +288,20 @@ fun SettingsScreen(
                 TextButton(onClick = { showLogoutDialog = false }) {
                     Text("Zrušit")
                 }
+            }
+        )
+    }
+
+    if (showAddChargerDialog) {
+        AddChargerDialog(
+            userEmail = preferences.email ?: "",
+            onDismiss = { showAddChargerDialog = false },
+            onSuccess = {
+                showAddChargerDialog = false
+                errorMessage = "Návrh byl úspěšně odeslán ke schválení"
+            },
+            onError = { error ->
+                errorMessage = error
             }
         )
     }
@@ -345,7 +332,6 @@ private fun UserProfileCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Avatar
                 Box(
                     modifier = Modifier
                         .size(64.dp)
@@ -361,9 +347,7 @@ private fun UserProfileCard(
                     )
                 }
 
-                Column(
-                    modifier = Modifier.weight(1f)
-                ) {
+                Column(modifier = Modifier.weight(1f)) {
                     if (isLoggedIn) {
                         Text(
                             text = displayName ?: "Uživatel",
@@ -393,7 +377,7 @@ private fun UserProfileCard(
                             color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                         Text(
-                            text = "Přihlaste se pro plný přístup",
+                            text = "Přihlaste se pro přidávání stanic",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                         )
@@ -403,7 +387,6 @@ private fun UserProfileCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Login/Logout Button
             Button(
                 onClick = if (isLoggedIn) onLogoutClick else onLoginClick,
                 modifier = Modifier.fillMaxWidth(),
@@ -462,7 +445,6 @@ private fun SettingsSectionCard(
                     color = MaterialTheme.colorScheme.primary
                 )
             }
-
             content()
         }
     }
@@ -491,9 +473,7 @@ private fun SwitchSettingItem(
             modifier = Modifier.size(24.dp)
         )
 
-        Column(
-            modifier = Modifier.weight(1f)
-        ) {
+        Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.bodyLarge,
@@ -518,10 +498,7 @@ private fun SwitchSettingItem(
 }
 
 @Composable
-private fun InfoItem(
-    label: String,
-    value: String
-) {
+private fun InfoItem(label: String, value: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -563,24 +540,19 @@ private fun LoginDialog(
             )
         },
         text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 AnimatedVisibility(
                     visible = selectedMethod == null,
                     enter = fadeIn() + expandVertically(),
                     exit = fadeOut() + shrinkVertically()
                 ) {
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(
                             text = "Vyberte způsob přihlášení:",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
 
-                        // Email Login Option
                         LoginMethodCard(
                             icon = Icons.Default.Email,
                             title = "Email",
@@ -588,7 +560,6 @@ private fun LoginDialog(
                             onClick = { selectedMethod = LoginMethod.EMAIL }
                         )
 
-                        // Google Login Option
                         LoginMethodCard(
                             icon = Icons.Default.AccountCircle,
                             title = "Google",
@@ -603,9 +574,7 @@ private fun LoginDialog(
                     enter = fadeIn() + expandVertically(),
                     exit = fadeOut() + shrinkVertically()
                 ) {
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedTextField(
                             value = email,
                             onValueChange = {
@@ -736,9 +705,7 @@ private fun LoginMethodCard(
                 )
             }
 
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleMedium,
@@ -758,5 +725,217 @@ private fun LoginMethodCard(
                 tint = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.5f)
             )
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AddChargerDialog(
+    userEmail: String,
+    onDismiss: () -> Unit,
+    onSuccess: () -> Unit,
+    onError: (String) -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var latitude by remember { mutableStateOf("") }
+    var longitude by remember { mutableStateOf("") }
+    var typeSpec by remember { mutableStateOf("charge_unloc") }
+    var description by remember { mutableStateOf("") }
+    var link by remember { mutableStateOf("") }
+    var isSubmitting by remember { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(false) }
+
+    val scope = rememberCoroutineScope()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Přidat novou stanici") },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Název stanice *") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = latitude,
+                    onValueChange = { latitude = it },
+                    label = { Text("Zeměpisná šířka *") },
+                    placeholder = { Text("např. 49.8175") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = longitude,
+                    onValueChange = { longitude = it },
+                    label = { Text("Zeměpisná délka *") },
+                    placeholder = { Text("např. 15.4730") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = !expanded }
+                ) {
+                    OutlinedTextField(
+                        value = when (typeSpec) {
+                            "charge_lock" -> "Zamčená stanice"
+                            "charge_unloc" -> "Odemčená stanice"
+                            else -> typeSpec
+                        },
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Typ stanice *") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor()
+                    )
+
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Zamčená stanice") },
+                            onClick = {
+                                typeSpec = "charge_lock"
+                                expanded = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Odemčená stanice") },
+                            onClick = {
+                                typeSpec = "charge_unloc"
+                                expanded = false
+                            }
+                        )
+                    }
+                }
+
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Popis *") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3
+                )
+
+                OutlinedTextField(
+                    value = link,
+                    onValueChange = { link = it },
+                    label = { Text("Odkaz (volitelné)") },
+                    placeholder = { Text("https://...") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Text(
+                    text = "* Povinná pole",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    scope.launch {
+                        isSubmitting = true
+                        val result = submitCharger(
+                            name = name,
+                            latitude = latitude,
+                            longitude = longitude,
+                            typeSpec = typeSpec,
+                            description = description,
+                            link = link.ifBlank { "https://hikerbox.matyasuss.cz" },
+                            userEmail = userEmail
+                        )
+                        isSubmitting = false
+
+                        if (result.isSuccess) {
+                            onSuccess()
+                        } else {
+                            onError(result.exceptionOrNull()?.message ?: "Chyba při odesílání")
+                        }
+                    }
+                },
+                enabled = !isSubmitting && name.isNotBlank() &&
+                        latitude.isNotBlank() && longitude.isNotBlank() &&
+                        description.isNotBlank()
+            ) {
+                if (isSubmitting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Text("Odeslat")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isSubmitting
+            ) {
+                Text("Zrušit")
+            }
+        }
+    )
+}
+
+private suspend fun submitCharger(
+    name: String,
+    latitude: String,
+    longitude: String,
+    typeSpec: String,
+    description: String,
+    link: String,
+    userEmail: String
+): Result<Unit> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+    try {
+        val lat = latitude.toDoubleOrNull() ?: return@withContext Result.failure(
+            Exception("Neplatná zeměpisná šířka")
+        )
+        val lon = longitude.toDoubleOrNull() ?: return@withContext Result.failure(
+            Exception("Neplatná zeměpisná délka")
+        )
+
+        val url = java.net.URL("https://hikerbox.matyasuss.cz/api/add_charger.php")
+        val connection = url.openConnection() as java.net.HttpURLConnection
+
+        connection.requestMethod = "POST"
+        connection.doOutput = true
+        connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+
+        val postData = "name=${java.net.URLEncoder.encode(name, "UTF-8")}" +
+                "&latitude=${java.net.URLEncoder.encode(lat.toString(), "UTF-8")}" +
+                "&longitude=${java.net.URLEncoder.encode(lon.toString(), "UTF-8")}" +
+                "&type_spec=${java.net.URLEncoder.encode(typeSpec, "UTF-8")}" +
+                "&description=${java.net.URLEncoder.encode(description, "UTF-8")}" +
+                "&link=${java.net.URLEncoder.encode(link, "UTF-8")}" +
+                "&user_email=${java.net.URLEncoder.encode(userEmail, "UTF-8")}"
+
+        connection.outputStream.write(postData.toByteArray())
+
+        val responseCode = connection.responseCode
+        if (responseCode == java.net.HttpURLConnection.HTTP_OK) {
+            Result.success(Unit)
+        } else {
+            val error = connection.errorStream?.bufferedReader()?.readText() ?: "Neznámá chyba"
+            Result.failure(Exception(error))
+        }
+    } catch (e: Exception) {
+        Result.failure(e)
     }
 }

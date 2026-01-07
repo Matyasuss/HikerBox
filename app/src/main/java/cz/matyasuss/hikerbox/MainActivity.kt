@@ -19,6 +19,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import cz.matyasuss.hikerbox.data.PreferencesManager
 import cz.matyasuss.hikerbox.ui.navigation.Screen
 import cz.matyasuss.hikerbox.ui.screen.DetailScreen
 import cz.matyasuss.hikerbox.ui.screen.HomeScreen
@@ -27,24 +28,37 @@ import cz.matyasuss.hikerbox.ui.screen.SettingsScreen
 import cz.matyasuss.hikerbox.ui.theme.HikerBoxTheme
 
 class MainActivity : ComponentActivity() {
+    private lateinit var preferencesManager: PreferencesManager
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        preferencesManager = PreferencesManager(this)
+
         enableEdgeToEdge()
         setContent {
-            HikerBoxTheme {
-                MainScreen()
+            val preferences by preferencesManager.userPreferences.collectAsState()
+            val isDarkTheme = preferences.darkMode
+
+            HikerBoxTheme(darkTheme = isDarkTheme) {
+                MainScreen(
+                    preferencesManager = preferencesManager,
+                    isDarkTheme = isDarkTheme
+                )
             }
         }
     }
 }
 
 @Composable
-fun MainScreen() {
+fun MainScreen(
+    preferencesManager: PreferencesManager,
+    isDarkTheme: Boolean
+) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    // Skrýt bottom bar na detail obrazovce
     val showBottomBar = currentRoute?.startsWith("detail/") != true
 
     Scaffold(
@@ -89,7 +103,10 @@ fun MainScreen() {
                 )
             }
             composable(Screen.Settings.route) {
-                SettingsScreen()
+                SettingsScreen(
+                    preferencesManager = preferencesManager,
+                    onThemeChange = { /* Theme se změní automaticky přes state */ }
+                )
             }
             composable(
                 route = Screen.Detail.route,
