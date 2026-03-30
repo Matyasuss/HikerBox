@@ -25,20 +25,32 @@ fun DetailScreen(
     chargerId: String,
     onNavigateBack: () -> Unit
 ) {
+    val context = LocalContext.current
+    val repository = remember { ChargerRepository(context) }
+
     var charger by remember { mutableStateOf<Charger?>(null) }
     var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
 
     // Load charger data
     LaunchedEffect(chargerId) {
         scope.launch {
             try {
-                val chargers = ChargerRepository.loadChargers()
-                charger = chargers.find { it.id == chargerId }
-                isLoading = false
+                val result = repository.loadChargers()
+                result.onSuccess { chargers ->
+                    charger = chargers.find { it.id == chargerId }
+                    if (charger == null) {
+                        errorMessage = "Nabíjecí stanice nenalezena"
+                    }
+                }.onFailure { e ->
+                    errorMessage = "Chyba při načítání: ${e.message}"
+                }
             } catch (e: Exception) {
+                errorMessage = "Chyba: ${e.message}"
                 e.printStackTrace()
+            } finally {
                 isLoading = false
             }
         }
@@ -65,16 +77,28 @@ fun DetailScreen(
             ) {
                 CircularProgressIndicator()
             }
-        } else if (charger == null) {
+        } else if (errorMessage != null) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues),
                 contentAlignment = Alignment.Center
             ) {
-                Text("Nabíjecí stanice nenalezena")
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = errorMessage!!,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    Button(onClick = onNavigateBack) {
+                        Text("Zpět")
+                    }
+                }
             }
-        } else {
+        } else if (charger != null) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
